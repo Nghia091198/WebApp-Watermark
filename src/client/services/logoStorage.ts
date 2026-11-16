@@ -1,26 +1,42 @@
-import { createStore, del, entries, set } from 'idb-keyval';
+import { createStore, del, set, values, type UseStore } from 'idb-keyval';
+import { requestPersistentStorage } from '@/client/services/storagePersistence';
 import { createId } from '@/client/utils/createId';
 import { LOGO_DATABASE } from '@/shared/constants/storage';
-import type { StoredLogo } from '@/shared/types/watermark';
+import { sortNewestFirst, toStoredLogo } from '@/shared/lib/logoRecord';
+import type { LogoRecord, StoredLogo } from '@/shared/types/watermark';
 
-const logoStore = createStore(LOGO_DATABASE.name, LOGO_DATABASE.storeName);
+let logoStore: UseStore | null = null;
+
+function getLogoStore(): UseStore {
+  logoStore ??= createStore(LOGO_DATABASE.name, LOGO_DATABASE.storeName);
+  return logoStore;
+}
 
 export async function listLogos(): Promise<StoredLogo[]> {
-  const records = await entries<string, StoredLogo>(logoStore);
-  return records.map(([, logo]) => logo).sort((first, second) => second.createdAt - first.createdAt);
+  const records = await values<unknown>(getLogoStore());
+  const logos = records.map(toStoredLogo).filter((logo): logo is StoredLogo => logo !== null);
+  return sortNewestFirst(logos);
 }
 
 export async function saveLogo(file: File): Promise<StoredLogo> {
-  const logo: StoredLogo = {
+  const record: LogoRecord = {
     id: createId(),
     name: file.name,
-    blob: file.slice(0, file.size, file.type),
+    mimeType: file.type,
+    data: await file.arrayBuffer(),
     createdAt: Date.now(),
   };
-  await set(logo.id, logo, logoStore);
-  return logo;
+  await set(record.id, record, getLogoStore());
+  void requestPersistentStorage();
+
+  return {
+    id: record.id,
+    name: record.name,
+    blob: new Blob([record.data], { type: record.mimeType }),
+    createdAt: record.createdAt,
+  };
 }
 
 export function deleteLogo(id: string): Promise<void> {
-  return del(id, logoStore);
+  return del(id, getLogoStore());
 }

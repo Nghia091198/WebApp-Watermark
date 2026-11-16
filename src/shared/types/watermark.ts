@@ -34,3 +34,11 @@ export interface StoredLogo {
   blob: Blob;
   createdAt: number;
 }
+
+export interface LogoRecord {
+  id: string;
+  name: string;
+  mimeType: string;
+  data: ArrayBuffer;
+  createdAt: number;
+}

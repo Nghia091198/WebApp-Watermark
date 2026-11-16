@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { deleteLogo, listLogos, saveLogo } from '@/client/services/logoStorage';
 import { readSelectedLogoId, writeSelectedLogoId } from '@/client/services/settingsStorage';
+import { withErrorDetail } from '@/client/utils/describeError';
 import { ERROR_MESSAGE } from '@/shared/constants/messages';
 import { isImageFile } from '@/shared/lib/imageFile';
+import { mergeLogosById } from '@/shared/lib/logoRecord';
 import type { StoredLogo } from '@/shared/types/watermark';
+
+function isFulfilled<T>(result: PromiseSettledResult<T>): result is PromiseFulfilledResult<T> {
+  return result.status === 'fulfilled';
+}
+
+function isRejected<T>(result: PromiseSettledResult<T>): result is PromiseRejectedResult {
+  return result.status === 'rejected';
+}
 
 export function useSavedLogos() {
   const [logos, setLogos] = useState<StoredLogo[]>([]);
@@ -18,10 +28,10 @@ export function useSavedLogos() {
     let isActive = true;
     listLogos()
       .then((storedLogos) => {
-        if (isActive) setLogos(storedLogos);
+        if (isActive) setLogos((current) => mergeLogosById(current, storedLogos));
       })
-      .catch(() => {
-        if (isActive) setError(ERROR_MESSAGE.logoListFailed);
+      .catch((loadError: unknown) => {
+        if (isActive) setError(withErrorDetail(ERROR_MESSAGE.logoListFailed, loadError));
       })
       .finally(() => {
         if (isActive) setIsLoading(false);
@@ -40,12 +50,16 @@ export function useSavedLogos() {
     if (imageFiles.length === 0) return;
 
     setError(null);
-    try {
-      const savedLogos = await Promise.all(imageFiles.map(saveLogo));
-      setLogos((current) => [...savedLogos, ...current]);
+    const outcomes = await Promise.allSettled(imageFiles.map(saveLogo));
+    const savedLogos = outcomes.filter(isFulfilled).map((outcome) => outcome.value);
+    const firstFailure = outcomes.find(isRejected);
+
+    if (savedLogos.length > 0) {
+      setLogos((current) => mergeLogosById(savedLogos, current));
       setPreferredLogoId(savedLogos[0].id);
-    } catch {
-      setError(ERROR_MESSAGE.logoSaveFailed);
+    }
+    if (firstFailure) {
+      setError(withErrorDetail(ERROR_MESSAGE.logoSaveFailed, firstFailure.reason));
     }
   }, []);
 
@@ -54,8 +68,8 @@ export function useSavedLogos() {
     try {
       await deleteLogo(id);
       setLogos((current) => current.filter((logo) => logo.id !== id));
-    } catch {
-      setError(ERROR_MESSAGE.logoDeleteFailed);
+    } catch (deleteError) {
+      setError(withErrorDetail(ERROR_MESSAGE.logoDeleteFailed, deleteError));
     }
   }, []);
 

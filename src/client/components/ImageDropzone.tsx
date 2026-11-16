@@ -30,7 +30,7 @@ export function ImageDropzone({ images, rejectedFileNames, isDisabled, onAdd, on
   return (
     <section className="panel">
       <div className="panel__header">
-        <h2 className="panel__title">2. Ảnh cần đóng logo {images.length > 0 && `(${images.length})`}</h2>
+        <h2 className="panel__title">3. Ảnh cần đóng logo {images.length > 0 && `(${images.length})`}</h2>
         {images.length > 0 && (
           <button type="button" className="button button--ghost" onClick={onClear} disabled={isDisabled}>
             Xoá hết

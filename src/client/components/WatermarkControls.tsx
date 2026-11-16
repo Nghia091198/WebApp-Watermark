@@ -13,7 +13,7 @@ const { scalePercent, opacityPercent, marginPercent } = WATERMARK_LIMITS;
 export function WatermarkControls({ layout, onChange }: WatermarkControlsProps) {
   return (
     <section className="panel">
-      <h2 className="panel__title">3. Vị trí & kích thước</h2>
+      <h2 className="panel__title">2. Vị trí & kích thước</h2>
       <div className="controls">
         <PositionPicker value={layout.position} onChange={(position) => onChange({ position })} />
         <div className="controls__sliders">
